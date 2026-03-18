@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: name (string), email (string), role (string: admin|technician)
+    //
+    // Collection: customers
+    // Fields: name (string), email (string), phone (string), address (string), createdAt (timestamp)
+    //
+    // Collection: jobs
+    // Fields: type (string: repair|installation), status (string: pending|in-progress|completed|cancelled), 
+    //         customerId (string), technicianId (string), description (string), cost (number), 
+    //         scheduledDate (timestamp), createdAt (timestamp)
+    //
+    // Collection: technicians
+    // Fields: name (string), email (string), specialty (string), status (string: active|inactive)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRegistered() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+         (request.auth.token.email != null && exists(/databases/$(database)/documents/users/$(request.auth.token.email))) ||
+         (request.auth.token.email == "codzlabzim53@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          getUserData().role == 'admin') ||
+         (request.auth.token.email == "codzlabzim53@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isManager() {
+      return isRegistered() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'manager';
+    }
+
+    function isTechnician() {
+      return isRegistered() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().role == 'technician';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.keys().hasOnly(['id', 'name', 'email', 'role']) &&
+             data.id is string && data.id.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['admin', 'manager', 'technician'];
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['name', 'email', 'phone', 'address']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.size() > 0 &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.address is string && data.address.size() > 0 && data.address.size() < 500;
+    }
+
+    function isValidJob(data) {
+      return data.keys().hasAll(['type', 'status', 'customerId', 'description', 'scheduledDate']) &&
+             data.keys().hasOnly(['type', 'status', 'customerId', 'technicianId', 'description', 'cost', 'scheduledDate', 'createdAt', 'history']) &&
+             data.type in ['repair', 'installation'] &&
+             data.status in ['pending', 'in-progress', 'completed', 'cancelled'] &&
+             data.customerId is string &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             data.scheduledDate is timestamp &&
+             (!('history' in data) || data.history is list);
+    }
+
+    function isValidTechnician(data) {
+      return data.keys().hasAll(['name', 'email', 'specialty', 'status']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.specialty is string && data.specialty.size() < 200 &&
+             data.status in ['active', 'inactive'];
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isRegistered();
+      allow create: if isAdmin() && isValidUser(request.resource.data);
+      allow update: if isAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /customers/{customerId} {
+      allow read: if isRegistered();
+      allow create: if (isAdmin() || isManager()) && isValidCustomer(request.resource.data);
+      allow update: if (isAdmin() || isManager()) && isValidCustomer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isRegistered();
+      allow create: if (isAdmin() || isManager()) && isValidJob(request.resource.data);
+      allow update: if (isAdmin() || isManager() || isTechnician()) && isValidJob(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /technicians/{techId} {
+      allow read: if isRegistered();
+      allow create: if isAdmin() && isValidTechnician(request.resource.data);
+      allow update: if isAdmin() && isValidTechnician(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

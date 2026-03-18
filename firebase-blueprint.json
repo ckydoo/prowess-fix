@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Client information for Prowess Technologies",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the customer" },
+        "email": { "type": "string", "format": "email", "description": "Contact email" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "address": { "type": "string", "description": "Service address" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the customer was added" }
+      },
+      "required": ["name", "email", "phone", "address"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A repair or installation service job",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["repair", "installation"], "description": "Type of service" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed", "cancelled"], "description": "Current status of the job" },
+        "customerId": { "type": "string", "description": "Reference to the customer" },
+        "technicianId": { "type": "string", "description": "Reference to the assigned technician" },
+        "description": { "type": "string", "description": "Details of the work needed" },
+        "cost": { "type": "number", "description": "Total cost of the service" },
+        "scheduledDate": { "type": "string", "format": "date-time", "description": "When the work is scheduled" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the job was created" },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "timestamp": { "type": "string", "format": "date-time" },
+              "type": { "type": "string", "enum": ["status_change", "technician_assignment", "creation", "update"] },
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "updatedBy": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["type", "status", "customerId", "description", "scheduledDate"]
+    },
+    "Technician": {
+      "title": "Technician",
+      "description": "Service personnel for Prowess Technologies",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the technician" },
+        "email": { "type": "string", "format": "email", "description": "Work email" },
+        "specialty": { "type": "string", "description": "Primary area of expertise" },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "Current work status" }
+      },
+      "required": ["name", "email"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "User's display name" },
+        "email": { "type": "string", "format": "email", "description": "User's email" },
+        "role": { "type": "string", "enum": ["admin", "manager", "technician"], "description": "System access level" }
+      },
+      "required": ["name", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/customers": { "schema": "Customer", "description": "Collection of clients" },
+    "/jobs": { "schema": "Job", "description": "Collection of service jobs" },
+    "/technicians": { "schema": "Technician", "description": "Collection of service staff" },
+    "/users": { "schema": "User", "description": "System user profiles" }
+  }
+}
